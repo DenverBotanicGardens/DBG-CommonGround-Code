@@ -1,0 +1,82 @@
+---
+title: "2025_Floristics-Pollinators"
+author: "Michelle DePrenger-Levin"
+date: "2025-12-15"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse) #for making figures
+library(dplyr) #data manipulation
+library(tidyr) #more data manipulation
+library(viridis) #colorblind friendly color palette
+library(ggthemes) #to make ggplots pretty
+# library(hrbrthemes) #to make ggplots pretty
+# library(waffle)
+
+```
+
+```{r}
+setwd("C:/Users/deprengm/Denver Botanic Gardens/Conservation - Restoration/CommonGround Golf Course/Data")
+```
+
+
+```{r}
+
+#species richness data
+data2023 <- read.csv("2023_VegPlot_Data/2023_PlantSurveys_SpeciesData.csv") #read in csv
+data2024 <- read.csv("2024_VegPlot_Data/2024_PlantSurveys_SpeciesRichness.csv")
+### data2025 <- 
+
+planttaxa <- data2024 %>%
+  dplyr::select(Date:Wetland_indicator_status) %>%
+  bind_rows(data2023) %>%
+  filter(Plot_number != "")
+
+
+
+```
+
+Figures
+```{r}
+
+planttaxa %>%
+  mutate(Year = format(as.Date(Date, format="%d/%m/%Y"),"%Y")) %>%
+  group_by(Year, Plot_number, Treatment, Species, Seeded.) %>%
+  dplyr::summarise(n = n()) 
+
+# summaries of species by plot
+planttaxa %>%
+  group_by(Plot_number, Treatment) %>%
+  summarise_all(n_distinct)
+  
+
+
+planttaxa %>%
+  filter(!grepl("\\?", Species)) %>%
+  filter(!grepl("unk", Species)) %>%
+  filter(!grepl("unmowed", Species)) %>%
+  filter(Species != "") %>%
+  mutate(Treatment = factor(Treatment, levels = c("C","S", "A/S", "A/S/H"))) %>%
+  mutate(Year = format(as.Date(Date, format="%d/%m/%Y"),"%Y")) %>%
+  filter(!is.na(Seeded.) & Seeded. != "") %>%
+  group_by(Year, Plot_number, Treatment, Species, Seeded.) %>%
+  dplyr::summarise(n = n()) %>%
+  mutate(SpIn = ifelse(n > 0, 1, 0)) %>%
+  group_by(Year, Plot_number, Treatment, Seeded.) %>%
+  dplyr::summarise(SpNum = sum(SpIn)) %>%
+ggplot(   aes(Treatment, SpNum, fill = Seeded.))+
+  geom_boxplot(position = position_dodge(width = 0.75), width = 0.5) +
+  geom_point(position = position_jitterdodge(jitter.height = 0, jitter.width = 0.1, dodge.width = 0.75))+
+  theme_bw()+
+  scale_fill_manual(values = c("slateblue","seagreen")) +
+  ylab("Number of species observations")
+
+
+planttaxa %>%
+  group_by(Species) %>%
+  dplyr::summarise(n = n()) %>%
+  print(n = 100)
+```
+
