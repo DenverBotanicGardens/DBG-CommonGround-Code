@@ -135,3 +135,58 @@ planttaxa %>%
   print(n = 100)
 ```
 
+
+
+# Pollinators  
+```{r}
+
+pollinator_df2024 <- read.csv("PollinatorObservations_data/2024_PollinatorObs_Data.csv")
+pollinator_df2025 <- read.csv("PollinatorObservations_data/2025_PollinatorObs_Data.csv")
+
+
+pollinator_df <- pollinator_df2024 %>%
+  bind_rows(pollinator_df2025) %>%
+  mutate(Date = as.Date(Date, format= "%m/%d/%Y")) %>%
+  mutate(Treatment = case_when(Treatment == "ASH" ~ "A/S/H",
+                               Treatment == "S " ~ "S",
+                               Treatment == "AS " ~ "A/S",
+                               Treatment == "AS" ~ "A/S",
+                               TRUE ~ Treatment)) %>%
+  filter(Treatment != "") %>%
+  mutate(Treatment = factor(Treatment, levels = c("C","S", "A/S", "A/S/H"))) %>%
+  mutate(Year = format(as.Date(Date, format="%m/%d/%Y"),"%Y"))
+
+pollinator_df %>%
+  filter(!(Year %in% c(2024, 2025)))
+
+
+ggplot(pollinator_df, aes(x=Treatment,y=Total, fill = Treatment))+
+  geom_boxplot()+
+  theme_bw()+
+  ggtitle("2024-2025 Pollinators")+
+  facet_wrap(~ Year)
+
+```
+
+
+```{r}
+
+pollinator_df_long <- pollinator_df %>%
+  select(Year, Plot, Treatment:Other.bee, Ants:Other) %>%
+  pivot_longer(cols = c(Honey.bees, Bumble.bees, Other.bee, Ants, 
+                        Butterfly, Beetle, Wasp, Flies, Other), 
+               names_to = "Guild", 
+               values_to = "Obs")
+
+pollinator_df_long %>%
+  group_by(Year, Plot, Treatment, Guild) %>%
+  summarise(TotalObs = sum(Obs)) %>%
+ggplot(    aes(Guild, TotalObs, fill = Treatment)) +
+  geom_boxplot() +
+  geom_point(position = position_jitterdodge(jitter.height = 0, jitter.width = 0.1)) +
+  facet_wrap(~ Year) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ylab("Total observations")
+
+```
+
