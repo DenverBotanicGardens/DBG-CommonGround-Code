@@ -27,13 +27,53 @@ setwd("C:/Users/deprengm/Denver Botanic Gardens/Conservation - Restoration/Commo
 #species richness data
 data2023 <- read.csv("2023_VegPlot_Data/2023_PlantSurveys_SpeciesData.csv") #read in csv
 data2024 <- read.csv("2024_VegPlot_Data/2024_PlantSurveys_SpeciesRichness.csv")
-### data2025 <- 
+data2025 <- read.csv("2025_VegPlot_Data/entirePlotTaxa_1.csv") ## not in nice format, missing data
+CommonGround0 <- read.csv("2025_VegPlot_Data/CommonGround_SeedlingExperiment_0.csv")
+seeded <- read.csv("SeededSpList.csv") # made list by hand
+
+data2025 <- data2025 %>%
+  mutate(Date = format(as.Date(CreationDate, format="%m/%d/%Y %H:%M"), "%m/%d/%Y")) %>%
+  mutate(Plot_number = Plot) %>%
+  left_join(CommonGround0, by = c("ParentGlobalID" = "GlobalID", "Plot" = "Plot")) %>%
+  mutate(Random_quadrat = NA,
+         Origin = NA,
+         C.value = NA,
+         Wetland_indicator_status = NA) %>% 
+  ## Change the species to codes 
+  rowwise() %>%
+  mutate(Species = case_when(grepl("_", Taxon) ~ paste0(substring(strsplit(Taxon, "_")[[1]][1], 1,3),
+                                                        substring(strsplit(Taxon, "_")[[1]][2], 1,3)),
+                             TRUE ~ Taxon)) %>%
+  mutate(Seeded. = case_when(Species %in% seeded$Species ~ "Yes",
+                             TRUE ~ "No")) %>%
+  ungroup() %>%
+  select(Date.x, Plot_number, Treatment, Random_quadrat, Species, 
+         Seeded., Origin, C.value, Wetland_indicator_status) %>%
+  rename(Date = Date.x) %>%
+  mutate(Treatment = case_when(Treatment == "control" ~ "C",
+                               Treatment == "seeded" ~ "S",
+                               Treatment == "aerated_seeded" ~ "A/S",
+                               Treatment == "aerated_seeded_harrowed" ~ "A/S/H"))
+
+# data2025 %>%
+#   rowwise() %>%
+#   # Change the species to codes
+#   mutate(SpeciesCode = case_when(grepl("_", Species) ~ paste0(substring(strsplit(Species, "_")[[1]][1], 1,3),
+#                                                         substring(strsplit(Species, "_")[[1]][2], 1,3)),
+#                              TRUE ~ Species))
+
 
 planttaxa <- data2024 %>%
   dplyr::select(Date:Wetland_indicator_status) %>%
   bind_rows(data2023) %>%
-  filter(Plot_number != "")
+  bind_rows(data2025) %>%
+  mutate(Species = tolower(Species)) %>%
+  filter(Plot_number != "") %>%
+  mutate(Year = format(as.Date(Date, format="%m/%d/%Y"),"%Y"))
 
+table(data2024$Species, data2024$Seeded.)
+table(data2023$Species, data2023$Seeded.)
+table(data2025$Species, data2025$Seeded.)
 
 
 ```
@@ -41,17 +81,12 @@ planttaxa <- data2024 %>%
 Figures
 ```{r}
 
-planttaxa %>%
-  mutate(Year = format(as.Date(Date, format="%d/%m/%Y"),"%Y")) %>%
-  group_by(Year, Plot_number, Treatment, Species, Seeded.) %>%
-  dplyr::summarise(n = n()) 
-
 # summaries of species by plot
 planttaxa %>%
   group_by(Plot_number, Treatment) %>%
   summarise_all(n_distinct)
   
-
+table(planttaxa$Date, useNA = "ifany")
 
 planttaxa %>%
   filter(!grepl("\\?", Species)) %>%
@@ -59,7 +94,6 @@ planttaxa %>%
   filter(!grepl("unmowed", Species)) %>%
   filter(Species != "") %>%
   mutate(Treatment = factor(Treatment, levels = c("C","S", "A/S", "A/S/H"))) %>%
-  mutate(Year = format(as.Date(Date, format="%d/%m/%Y"),"%Y")) %>%
   filter(!is.na(Seeded.) & Seeded. != "") %>%
   group_by(Year, Plot_number, Treatment, Species, Seeded.) %>%
   dplyr::summarise(n = n()) %>%
@@ -71,6 +105,27 @@ ggplot(   aes(Treatment, SpNum, fill = Seeded.))+
   geom_point(position = position_jitterdodge(jitter.height = 0, jitter.width = 0.1, dodge.width = 0.75))+
   theme_bw()+
   scale_fill_manual(values = c("slateblue","seagreen")) +
+  facet_wrap(~Year) +
+  ylab("Number of species observations")
+
+planttaxa %>%
+  filter(!grepl("\\?", Species)) %>%
+  filter(!grepl("unk", Species)) %>%
+  filter(!grepl("unmowed", Species)) %>%
+  filter(Species != "") %>%
+  mutate(Treatment = factor(Treatment, levels = c("C","S", "A/S", "A/S/H"))) %>%
+  filter(!is.na(Seeded.) & Seeded. != "") %>%
+  group_by(Year, Plot_number, Treatment, Species, Seeded.) %>%
+  dplyr::summarise(n = n()) %>%
+  mutate(SpIn = ifelse(n > 0, 1, 0)) %>%
+  group_by(Year, Plot_number, Treatment, Seeded.) %>%
+  dplyr::summarise(SpNum = sum(SpIn)) %>%
+ggplot(   aes(Treatment, SpNum, fill = Year))+
+  geom_boxplot(position = position_dodge(width = 0.75), width = 0.5) +
+  geom_point(position = position_jitterdodge(jitter.height = 0, jitter.width = 0.1, dodge.width = 0.75))+
+  theme_bw()+
+  scale_fill_manual(values = c("grey10","grey50","grey70")) +
+  facet_wrap(~Seeded., scales = "free") +
   ylab("Number of species observations")
 
 
